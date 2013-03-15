@@ -1,12 +1,29 @@
 package yak.antti;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URL;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.StatusLine;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
 
 import android.net.Uri;
 import android.os.Bundle;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.view.Menu;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,6 +33,7 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.LinearLayout.LayoutParams;
 
+import android.text.InputType;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -87,6 +105,10 @@ public class MainActivity extends Activity {
 		if (verb.equals("list")) {
 			String[] labels = extras.getString("items").split(";");
 			displayList(labels);
+		} else if (verb.equals("channel")) {
+			displayChannel(words[2]);
+		} else if (verb.equals("create")) {
+			displayCreateInode();
 		} else if (verb.equals("web")) {
 			displayWeb((String)extras.get("html"));
 		} else {
@@ -95,7 +117,7 @@ public class MainActivity extends Activity {
 	}
 
 	private void displayDefault() {
-		String[] numbers = new String[] {"One", "Two", "Three"};
+		String[] numbers = new String[] {"One", "Two", "Three", "Channel"};
 		DemoListView v = new DemoListView(mainContext, numbers);
 		setContentView(v);
 	}
@@ -103,6 +125,136 @@ public class MainActivity extends Activity {
 	private void displayWeb(String html) {
 		DemoWebView v = new DemoWebView(mainContext, html);
 		setContentView(v);
+	}
+	
+	private void displayChannel(String chanKey) {
+		StringBuilder sb = new StringBuilder();
+		Store store = new Store("http://192.168.0.157:30332/");
+		String[] inodes = store.fetchInodes(chanKey);
+		sb.append(this.renderInodes(inodes));
+		sb.append("<p><a href=\"/create\">Create</a></p>");
+		
+		DemoWebView v = new DemoWebView(mainContext, sb.toString());
+		setContentView(v);
+	}
+	
+	private String renderInodes(String[] inodes) {
+		StringBuilder sb = new StringBuilder();
+		for (String inode : inodes) {
+			sb.append("<p>");
+			sb.append(inode);
+			sb.append("</p>");
+		}
+		return sb.toString();
+	}
+
+	public void displayCreateInode() {
+		final EditText ed = new EditText(this);
+
+		ed.setInputType(InputType.TYPE_CLASS_TEXT
+				| InputType.TYPE_TEXT_FLAG_MULTI_LINE
+				| InputType.TYPE_TEXT_VARIATION_LONG_MESSAGE
+				| InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+		
+		final LayoutParams widgetParams = new LayoutParams(
+				ViewGroup.LayoutParams.FILL_PARENT,
+				ViewGroup.LayoutParams.FILL_PARENT, 1.0f);
+		
+		ed.setLayoutParams(widgetParams);
+		ed.setTextAppearance(this, R.style.teletype);
+		ed.setBackgroundColor(Color.BLACK);
+		ed.setGravity(Gravity.TOP);
+		ed.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_INSET);
+		ed.setVerticalFadingEdgeEnabled(true);
+		ed.setVerticalScrollBarEnabled(true);
+		ed.setOnKeyListener(new OnKeyListener() {
+			public boolean onKey(View v, int keyCode, KeyEvent event) {
+				// If the event is a key-down event on the "enter"
+				// button
+				// if ((event.getAction() == KeyEvent.ACTION_DOWN)
+				// &&
+				// (keyCode == KeyEvent.KEYCODE_ENTER)) {
+				// // Perform action on key press
+				// Toast.makeText(TerseActivity.this, ed.getText(),
+				// Toast.LENGTH_SHORT).show();
+				// return true;
+				// }
+				return false;
+			}
+		});
+
+		Button btn = new Button(this);
+		btn.setText("Send");
+		btn.setOnClickListener(new OnClickListener() {
+			public void onClick(View v) {
+				return;
+			}
+		});
+
+		LinearLayout linear = new LinearLayout(this);
+		linear.setOrientation(LinearLayout.VERTICAL);
+		linear.addView(btn);
+		linear.addView(ed);
+		setContentView(linear);
+	}
+	
+	// Provides access to the storage.
+	public class Store {
+		
+		String baseUrl;
+		
+		public Store(String baseUrl) {
+			this.baseUrl = baseUrl;
+		}
+		
+		// Fetch the inodes from storage.
+		public String[] fetchInodes(String chanKey) {
+			String scanUrl = this.baseUrl + "?f=scan&c=" + chanKey;
+			String scan = null;
+			
+			try {
+				scan = this.getUrl(scanUrl);
+			} catch (ClientProtocolException e) {
+				Log.i("antti", e.getMessage());
+			} catch (IOException e) {
+				Log.i("antti", e.getMessage());
+			}
+			
+			Log.i("antii", "~~~SCAN:" + scan);
+			
+			String[] inodeKeys = scan.split("\n");
+			int n = inodeKeys.length;
+			String[] inodes = new String[n];
+			for (int i = 0; i < n; i++) {
+				String fetchUrl = this.baseUrl + "?f=fetch&c=" + chanKey + "&i=" + inodeKeys[i];
+				try {
+					inodes[i] = this.getUrl(fetchUrl);
+				} catch (ClientProtocolException e) {
+					Log.i("antti", e.getMessage());
+				} catch (IOException e) {
+					Log.i("antti", e.getMessage());
+				}
+			}
+			
+			return inodes;
+		}
+		
+		private String getUrl(String url) throws ClientProtocolException, IOException {
+			HttpClient httpclient = new DefaultHttpClient();
+		    HttpResponse response = httpclient.execute(new HttpGet(url));
+		    StatusLine statusLine = response.getStatusLine();
+		    if(statusLine.getStatusCode() == HttpStatus.SC_OK){
+		        ByteArrayOutputStream out = new ByteArrayOutputStream();
+		        response.getEntity().writeTo(out);
+		        out.close();
+		        String responseString = out.toString();
+		        return responseString;
+		    } else{
+		        //Closes the connection.
+		        response.getEntity().getContent().close();
+		        throw new IOException(statusLine.getReasonPhrase());
+		    }
+		}
 	}
 
 	private void displayList(String[] labels) {
@@ -154,8 +306,13 @@ public class MainActivity extends Activity {
 
 		@Override
 		protected void onClick(int index, String label) {
-			String html = "GOT {" + label + "}.";
-			startWeb(html);
+			if (label == "Channel") {
+				startChannel("555");
+			} else {
+			
+				String html = "GOT {" + label + "}.";
+				startWeb(html);
+			}
 //			DemoWebView v = new DemoWebView(context, html);
 //			setContentView(v);
 		}
@@ -201,6 +358,8 @@ public class MainActivity extends Activity {
 			String path = uri.getPath();
 			String query = uri.getQuery();
 			
+			startMain(path, query);
+			
 			return true;
 		}	
 	}
@@ -214,6 +373,10 @@ public class MainActivity extends Activity {
 	}
 	void startWeb(String html) {
 		startMain("/web", null, "html", html);
+	}
+	
+	void startChannel(String chanKey) {
+		startMain("/channel/" + chanKey, null);
 	}
 
 	void startMain(String actPath, String actQuery, String... extrasKV) {
