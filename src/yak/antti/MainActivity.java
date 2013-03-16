@@ -16,6 +16,7 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.DefaultHttpClient;
 
 import android.net.Uri;
@@ -69,6 +70,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
 
 	Context mainContext;
+	Store store = new Store("http://yak.net:30332/");
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -88,7 +90,7 @@ public class MainActivity extends Activity {
 		String path = uri == null ? "/" : uri.getPath();
 		String query = uri == null ? "" : uri.getQuery();
 
-		display(path, query, extras, savedInstanceState);
+		display(path, query, extras, savedInstanceState); 
 	}
 
 	private void display(String path, String query, Bundle extras,
@@ -129,8 +131,14 @@ public class MainActivity extends Activity {
 	
 	private void displayChannel(String chanKey) {
 		StringBuilder sb = new StringBuilder();
-		Store store = new Store("http://192.168.0.157:30332/");
-		String[] inodes = store.fetchInodes(chanKey);
+		String[] inodes = null;
+		try {
+			inodes = this.store.fetchInodes(chanKey);
+		} catch (ClientProtocolException e) {
+			Log.i("antti", e.getMessage());
+		} catch (IOException e) {
+			Log.i("antti", e.getMessage());
+		}
 		sb.append(this.renderInodes(inodes));
 		sb.append("<p><a href=\"/create\">Create</a></p>");
 		
@@ -187,6 +195,7 @@ public class MainActivity extends Activity {
 		btn.setText("Send");
 		btn.setOnClickListener(new OnClickListener() {
 			public void onClick(View v) {
+				
 				return;
 			}
 		});
@@ -208,35 +217,33 @@ public class MainActivity extends Activity {
 		}
 		
 		// Fetch the inodes from storage.
-		public String[] fetchInodes(String chanKey) {
-			String scanUrl = this.baseUrl + "?f=scan&c=" + chanKey;
+		public String[] fetchInodes(String chanKey) throws ClientProtocolException, IOException {
+			String scanUrl = this.baseUrl + "?f=scan&u=0&c=" + chanKey;
 			String scan = null;
 			
-			try {
-				scan = this.getUrl(scanUrl);
-			} catch (ClientProtocolException e) {
-				Log.i("antti", e.getMessage());
-			} catch (IOException e) {
-				Log.i("antti", e.getMessage());
-			}
-			
-			Log.i("antii", "~~~SCAN:" + scan);
+			Log.i("antti", "~~~Store Scan Url: " + scanUrl);
+			scan = this.getUrl(scanUrl);
+			Log.i("antti", "~~~Store Scan Reply: " + scan);
 			
 			String[] inodeKeys = scan.split("\n");
 			int n = inodeKeys.length;
 			String[] inodes = new String[n];
+			
+			Log.i("antti", "~~~Store found " + n + " number of inode keys to fetch.");
 			for (int i = 0; i < n; i++) {
-				String fetchUrl = this.baseUrl + "?f=fetch&c=" + chanKey + "&i=" + inodeKeys[i];
-				try {
-					inodes[i] = this.getUrl(fetchUrl);
-				} catch (ClientProtocolException e) {
-					Log.i("antti", e.getMessage());
-				} catch (IOException e) {
-					Log.i("antti", e.getMessage());
-				}
+				String fetchUrl = this.baseUrl + "?f=fetch&u=0&c=" + chanKey + "&i=" + inodeKeys[i];
+				
+				Log.i("antti", "~~~Store Fetch Url: " + fetchUrl);
+				inodes[i] = this.getUrl(fetchUrl);
+				Log.i("antti", "~~~Store Fetch Reply: " + inodes[i]);
 			}
 			
 			return inodes;
+		}
+		
+		private void createInode(String chanKey, String inode, String value, String user) throws ClientProtocolException, IOException {
+			String createUrl = this.baseUrl + "?f=create&u=0&c=" + chanKey + "&i=" + inode + "&value=" + value + "&u=" + user;
+			getUrl(createUrl);
 		}
 		
 		private String getUrl(String url) throws ClientProtocolException, IOException {
@@ -249,7 +256,7 @@ public class MainActivity extends Activity {
 		        out.close();
 		        String responseString = out.toString();
 		        return responseString;
-		    } else{
+		    } else {
 		        //Closes the connection.
 		        response.getEntity().getContent().close();
 		        throw new IOException(statusLine.getReasonPhrase());
