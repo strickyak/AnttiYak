@@ -8,6 +8,8 @@
 
 import cgi
 import glob
+import os
+import re
 import subprocess
 import sys
 import traceback
@@ -16,6 +18,12 @@ import urlparse
 from BaseHTTPServer import HTTPServer
 from BaseHTTPServer import BaseHTTPRequestHandler
 
+CLEAN = re.compile('^([-A-Za-z0-9_]+([.][-A-Za-z0-9_]+)?)?$').match
+def CheckClean(what, value):
+  if value:
+    if not CLEAN(value):
+      raise Exception('bad %s: %s' % (what, value))
+
 class AHandler(BaseHTTPRequestHandler):
   def do_GET(s):
     path = s.path
@@ -23,11 +31,22 @@ class AHandler(BaseHTTPRequestHandler):
     q = urlparse.parse_qs(p.query)
 
     verb = q.get('f') and q['f'][0]
+    CheckClean('f', verb)
+
     user = q.get('u') and q['u'][0]
+    CheckClean('u', user)
+
     chan = q.get('c') and q['c'][0]
+    CheckClean('c', chan)
+
     inode = q.get('i') and q['i'][0]
+    CheckClean('i', inode)
+
     latest = q.get('latest') and q['latest'][0]
+    CheckClean('latest', latest)
+
     value = q.get('value') and q['value'][0]
+    CheckClean('value', value)
 
     try:
       if verb == 'scan':
@@ -72,6 +91,11 @@ def doVerbCreate(chan, inode, value, user):
   f.write(value)
   f.close()
   return ''
+
+os.system('mkdir -p data/555') and os.exit(13)
+os.system('echo Appl > data/555/100.alice') and os.exit(14)
+os.system('echo Banana > data/555/200.bob') and os.exit(15)
+os.system('echo Coconut > data/555/300.carla') and os.exit(16)
 
 address = sys.argv[1]
 serv = HTTPServer((address, 30332), AHandler)
