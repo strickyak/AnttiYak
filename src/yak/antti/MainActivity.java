@@ -5,6 +5,7 @@ import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -70,6 +71,18 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
+	
+	static final int NumRandomBitsPerDHKey = 1535;
+	
+	static final String Rfc3526Modulus1536Bits =
+	  "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1" +
+      "29024E088A67CC74020BBEA63B139B22514A08798E3404DD" +
+      "EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245" +
+      "E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED" +
+      "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3D" +
+      "C2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F" +
+      "83655D23DCA3AD961C62F356208552BB9ED529077096966D" +
+      "670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF";
 
 	Context mainContext;
 	Store store = new Store("http://yak.net:30332/");
@@ -115,6 +128,8 @@ public class MainActivity extends Activity {
 			displayCreateInode();
 		} else if (verb.equals("rendez")) {
 			displayRendezvous(words[2]);
+		} else if (verb.equals("dhdemo")) {
+			displayDHDemo();
 		} else if (verb.equals("web")) {
 			displayWeb((String)extras.get("html"));
 		} else {
@@ -123,7 +138,7 @@ public class MainActivity extends Activity {
 	}
 
 	private void displayDefault() {
-		String[] numbers = new String[] {"One", "Two", "Three", "Channel", "Rendezvous"};
+		String[] numbers = new String[] {"One", "Two", "Three", "Channel", "Rendezvous", "dhdemo"};
 		DemoListView v = new DemoListView(mainContext, numbers);
 		setContentView(v);
 	}
@@ -214,6 +229,36 @@ public class MainActivity extends Activity {
 	public void displayRendezvous(String myId) {
 		DemoWebView v = new DemoWebView(mainContext, "");
 		v.loadUrl("file:///android_asset/redez_start.html");
+		setContentView(v);
+	}
+	
+	public void displayDHDemo() {  // DH DEMO
+		BigInteger g = new BigInteger("2");
+		BigInteger m = new BigInteger(Rfc3526Modulus1536Bits, 16);
+
+		SecureRandom rand = new SecureRandom();
+		BigInteger secA = new BigInteger(NumRandomBitsPerDHKey, rand);
+		BigInteger secB = new BigInteger(NumRandomBitsPerDHKey, rand);
+		// Each raises g to the secret key to get the public key.
+		BigInteger pubA = g.modPow(secA, m);
+		BigInteger pubB = g.modPow(secB, m);
+		// A learns pubB; B learns pubA.
+		BigInteger mutualA = pubB.modPow(secA, m);  // A can compute.
+		BigInteger mutualB = pubA.modPow(secB, m);  // B can compute.
+		// Those mutual keys should be equal.
+		BigInteger mutualDiff = mutualA.subtract(mutualB);
+		
+		String html = "<html><body><ul>";
+		html += "<li> secA = " + secA;
+		html += "<li> secB = " + secB;
+		html += "<li> pubA = " + pubA;
+		html += "<li> pubB = " + pubB;
+		html += "<li> mutualA = " + mutualA;
+		html += "<li> mutualB = " + mutualB;
+		html += "<li> mutualDiff = " + mutualDiff;
+		html += "<li> len(mutual) = " + mutualA.toString().length() + " decimal digits";
+		
+		DemoWebView v = new DemoWebView(mainContext, html);
 		setContentView(v);
 	}
 	
@@ -325,6 +370,8 @@ public class MainActivity extends Activity {
 		protected void onClick(int index, String label) {
 			if (label == "Channel") {
 				startChannel("555");
+			} else if (label == "dhdemo") {
+				startDHDemo();
 			} else if (label == "Rendezvous") {
 				SecureRandom random = null;
 				try {
@@ -406,6 +453,10 @@ public class MainActivity extends Activity {
 	
 	void startRendezvous(String myId) {
 		startMain("/rendez/" + myId, null);
+	}
+	
+	void startDHDemo() {
+		startMain("/dhdemo", null);
 	}
 
 	void startMain(String actPath, String actQuery, String... extrasKV) {
