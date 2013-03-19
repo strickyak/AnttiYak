@@ -9,6 +9,8 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
@@ -111,6 +113,8 @@ public class MainActivity extends Activity {
 			displayChannel(words[2]);
 		} else if (verb.equals("create")) {
 			displayCreateInode();
+		} else if (verb.equals("rendez")) {
+			displayRendezvous(words[2]);
 		} else if (verb.equals("web")) {
 			displayWeb((String)extras.get("html"));
 		} else {
@@ -119,7 +123,7 @@ public class MainActivity extends Activity {
 	}
 
 	private void displayDefault() {
-		String[] numbers = new String[] {"One", "Two", "Three", "Channel"};
+		String[] numbers = new String[] {"One", "Two", "Three", "Channel", "Rendezvous"};
 		DemoListView v = new DemoListView(mainContext, numbers);
 		setContentView(v);
 	}
@@ -205,6 +209,12 @@ public class MainActivity extends Activity {
 		linear.addView(btn);
 		linear.addView(ed);
 		setContentView(linear);
+	}
+	
+	public void displayRendezvous(String myId) {
+		DemoWebView v = new DemoWebView(mainContext, "");
+		v.loadUrl("file:///android_asset/redez_start.html");
+		setContentView(v);
 	}
 	
 	// Provides access to the storage.
@@ -315,8 +325,16 @@ public class MainActivity extends Activity {
 		protected void onClick(int index, String label) {
 			if (label == "Channel") {
 				startChannel("555");
+			} else if (label == "Rendezvous") {
+				SecureRandom random = null;
+				try {
+					random = SecureRandom.getInstance("SHA1PRNG");
+				} catch (NoSuchAlgorithmException e) {
+					Log.i("antti", e.getMessage());
+				}
+				int mytempid = random.nextInt();
+				startRendezvous(String.valueOf(mytempid));
 			} else {
-			
 				String html = "GOT {" + label + "}.";
 				startWeb(html);
 			}
@@ -384,6 +402,10 @@ public class MainActivity extends Activity {
 	
 	void startChannel(String chanKey) {
 		startMain("/channel/" + chanKey, null);
+	}
+	
+	void startRendezvous(String myId) {
+		startMain("/rendez/" + myId, null);
 	}
 
 	void startMain(String actPath, String actQuery, String... extrasKV) {
