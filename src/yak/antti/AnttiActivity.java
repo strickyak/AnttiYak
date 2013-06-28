@@ -70,7 +70,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-public class MainActivity extends Activity {
+public class AnttiActivity extends Activity {
 	
 	static final int NumRandomBitsPerDHKey = 1535;
 	
@@ -463,7 +463,7 @@ public class MainActivity extends Activity {
 		Uri uri = new Uri.Builder().scheme("terse").path(actPath)
 				.encodedQuery(actQuery).build();
 		Intent intent = new Intent("android.intent.action.MAIN", uri);
-		intent.setClass(getApplicationContext(), MainActivity.class);
+		intent.setClass(getApplicationContext(), AnttiActivity.class);
 		for (int i = 0; i < extrasKV.length; i += 2) {
 			intent.putExtra((String)extrasKV[i], extrasKV[i + 1]);
 		}
